@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'register_screen.dart';
 import 'attendee_screen.dart';
 import 'sponsor_screen.dart';
 import 'exhibitor_screen.dart';
 import 'speaker_screen.dart';
+import 'email_request.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -20,41 +19,70 @@ class _LoginScreenState extends State<LoginScreen> {
   bool rememberMe = false;
   bool isLoading = false;
 
+  final supabase = Supabase.instance.client;
+
+  /// ✅ **Login with Supabase Auth**
   Future<void> login() async {
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
-    final response = await http.post(
-      Uri.parse("http://10.0.2.2/ventflow_backend/login.php"), // Change to your server IP if needed
-      body: {
-        "email": emailController.text,
-        "password": passwordController.text,
-      },
-    );
+    try {
+      print("🔍 Attempting login for: ${emailController.text}");
 
-    setState(() {
-      isLoading = false;
-    });
+      // 🔹 **Step 1: Authenticate User**
+      final response = await supabase.auth.signInWithPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
 
-    final data = json.decode(response.body);
-    if (data["status"] == "success") {
-      String role = data["role"];
+      print("✅ Supabase Response: $response");
 
-      if (role == "attendee") {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AttendeeScreen()));
-      } else if (role == "sponsor") {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => SponsorScreen()));
-      } else if (role == "exhibitor") {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ExhibitorScreen()));
-      } else if (role == "speaker") {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => SpeakerScreen()));
+      final user = response.user;
+      if (user == null) {
+        throw "Invalid email or password";
       }
-    } else {
+
+      print("✅ Login Successful! User ID: ${user.id}");
+
+      // 🔹 **Step 2: Fetch User Role**
+      final userData = await supabase
+          .from('users')
+          .select('role, first_name, id')
+          .eq('email', user.email!)
+          .maybeSingle();
+
+      print("✅ User Data: $userData"); // Debugging Log
+
+      if (userData == null) {
+        throw "User data not found in database.";
+      }
+
+      String role = userData['role'];
+      String firstName = userData['first_name'];
+      String userId = userData['id'].toString(); // ✅ Convert to String
+
+      // 🔹 **Step 3: Navigate to the Correct Screen Based on Role**
+      Widget nextScreen;
+      if (role == "attendee") {
+        nextScreen = AttendeeScreen(firstName: firstName, userId: userId);
+      } else if (role == "sponsor") {
+        nextScreen = SponsorScreen();
+      } else if (role == "exhibitor") {
+        nextScreen = ExhibitorScreen();
+      } else if (role == "speaker") {
+        nextScreen = SpeakerScreen();
+      } else {
+        nextScreen = AttendeeScreen(firstName: firstName, userId: userId);
+      }
+
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => nextScreen));
+    } catch (error) {
+      print("❌ Login failed: $error");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(data["message"]), backgroundColor: Colors.red),
+        SnackBar(content: Text(error.toString()), backgroundColor: Colors.red),
       );
     }
+
+    setState(() => isLoading = false);
   }
 
   @override
@@ -89,6 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: GoogleFonts.sen(fontSize: 20, color: Colors.white),
                   ),
                   SizedBox(height: 20),
+                  // ✅ **Email Input**
                   TextField(
                     controller: emailController,
                     style: TextStyle(color: Colors.white),
@@ -101,6 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   SizedBox(height: 10),
+                  // ✅ **Password Input**
                   TextField(
                     controller: passwordController,
                     obscureText: true,
@@ -132,19 +162,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       TextButton(
                         onPressed: () {
-                          // Navigate to Forgot Password Screen (if needed)
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => ForgotPasswordScreen()),
+                          );
                         },
                         child: Text("Forgot Password?", style: TextStyle(color: Colors.white)),
                       ),
                     ],
                   ),
                   SizedBox(height: 20),
+                  // ✅ **Login Button**
                   Center(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black,
-                        padding: EdgeInsets.symmetric(horizontal: 130, vertical: 10),
+                        padding: EdgeInsets.symmetric(horizontal: 120, vertical: 10),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: isLoading ? null : login,

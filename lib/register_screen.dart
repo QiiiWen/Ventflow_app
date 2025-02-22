@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
-import 'package:uni_links/uni_links.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
-import 'dart:convert';
-
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -17,99 +15,99 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
 
-  bool _isLoading = false; // For showing loading indicator
-  StreamSubscription? _sub; // For deep link handling
+  final supabase = Supabase.instance.client;
 
-
-  @override
-  void initState() {
-    super.initState();
-    _initDeepLinkListener(); // Start listening for deep links
-  }
-
-  void _initDeepLinkListener() {
-    _sub = uriLinkStream.listen((Uri? uri) {
-      if (uri != null && uri.host == "account_verified") {
-        _showVerificationSuccessDialog();
-      }
-    });
-  }
-
+  // ✅ Register a new user & auto-create profile
   Future<void> _registerUser() async {
     if (passwordController.text != confirmPasswordController.text) {
       _showMessage("Passwords do not match!", Colors.red);
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Use 10.0.2.2 for Android Emulator or PC Localhost IP for real devices
-    String url = "http://10.0.2.2/ventflow_backend/register.php";
+    setState(() => _isLoading = true);
 
     try {
-      var response = await http.post(
-        Uri.parse(url),
-        body: {
-          "first_name": firstNameController.text,
-          "last_name": lastNameController.text,
-          "email": emailController.text,
-          "password": passwordController.text,
-        },
+      // ✅ Sign up user (Supabase will send a verification email automatically)
+      final response = await supabase.auth.signUp(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
       );
 
-      var jsonResponse = jsonDecode(response.body);
-
-      if (jsonResponse["success"]) {
-        // Show verification popup when registration is successful
-        _showVerificationPopup(emailController.text);
-      } else {
-        _showMessage(jsonResponse["message"], Colors.red);
+      if (response.user == null) {
+        throw "Registration failed. Try again.";
       }
-    } catch (e) {
-      _showMessage("Error: $e", Colors.red);
-    } finally {
-      setState(() {
-        _isLoading = false;
+
+      final userId = response.user!.id; // 🔹 Get the user ID
+
+      // ✅ Insert user data into `users` table
+      await supabase.from('users').upsert({
+        'id': userId,
+        'first_name': firstNameController.text.trim(),
+        'last_name': lastNameController.text.trim(),
+        'email': emailController.text.trim(),
+        'role': 'attendee', // Default role
+        'verified': false, // Mark as unverified
       });
+
+      // ✅ Create an empty profile for the user in `user_profiles`
+      await supabase.from('user_profiles').upsert({
+        'user_id': userId,
+        'username': emailController.text.split('@')[0], // Default username
+        'profile_pic': '', // Empty profile pic
+        'location': '',
+        'bio': '',
+        'followers': 0,
+        'following': 0,
+        'created_at': DateTime.now().toIso8601String(),
+        'is_private': false,
+        'visible_to_public': true,
+      });
+
+      // ✅ Show verification popup
+      _showVerificationPopup(emailController.text);
+    } catch (error) {
+      _showMessage(error.toString(), Colors.red);
     }
+
+    setState(() => _isLoading = false);
   }
 
+  // ✅ Show verification popup
   void _showVerificationPopup(String email) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Allows the modal to expand to full screen if necessary
+      isScrollControlled: true,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
         return FractionallySizedBox(
-          heightFactor: 0.6, // Adjusts the height of the modal to 80% of the screen height
+          heightFactor: 0.6,
           child: Padding(
             padding: EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                      IconButton(
-                        alignment: Alignment.centerLeft ,
-                      icon: Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
+                IconButton(
+                  alignment: Alignment.centerLeft,
+                  icon: Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
                 SizedBox(height: 20),
                 Text(
-                "Account Verification",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.sen(fontSize: 22, fontWeight: FontWeight.bold),
+                  "Account Verification",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.sen(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 Icon(Icons.mail_outline, size: 100, color: Colors.black),
                 SizedBox(height: 20),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20), // Adds horizontal padding to the text
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
                     "A verification link has been sent to $email.\nPlease check your spam folder if you haven't received it.",
-                    textAlign: TextAlign.start,
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.sen(fontSize: 16, color: Colors.black54),
                   ),
                 ),
@@ -119,40 +117,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
       },
     );
+
+    // ✅ Auto-redirect to LoginScreen after 3 seconds
+    Future.delayed(Duration(seconds: 3), () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LoginScreen()),
+      );
+    });
   }
 
-  void _showVerificationSuccessDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text("Account Verification"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 80),
-              SizedBox(height: 10),
-              Text("Account Verification Complete!"),
-            ],
-          ),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                Navigator.pushNamed(context, '/login'); // Navigate to Login Page
-              },
-              child: Text("Let's Log In Now!"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
+  // ✅ Show message (error or success)
   void _showMessage(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: color),
@@ -187,48 +162,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 SizedBox(height: 10),
                 Text(
                   "Register an\nAccount",
-                  style: GoogleFonts.sen(
-                    fontSize: 38,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  "Have a great full journey using this app!",
-                  style: GoogleFonts.sen(
-                    fontSize: 18,
-                    color: Colors.white70,
-                  ),
+                  style: GoogleFonts.sen(fontSize: 38, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 SizedBox(height: 20),
                 Row(
                   children: [
-                    Expanded(
-                      child: _buildTextField("First Name", firstNameController),
-                    ),
+                    Expanded(child: _buildTextField("First Name", firstNameController)),
                     SizedBox(width: 10),
-                    Expanded(
-                      child: _buildTextField("Last Name", lastNameController),
-                    ),
+                    Expanded(child: _buildTextField("Last Name", lastNameController)),
                   ],
                 ),
                 SizedBox(height: 15),
                 _buildTextField("Email", emailController),
                 SizedBox(height: 15),
                 _buildTextField("Set Password", passwordController, isPassword: true),
-                SizedBox(height: 5),
-                Text(
-                  "please type password",
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
-                ),
                 SizedBox(height: 15),
-                _buildTextField("Retype new-Password", confirmPasswordController, isPassword: true),
-                SizedBox(height: 10),
-                Text(
-                  "*password must be at least 8 characters and include at least a number, symbol and a capital letter",
-                  style: TextStyle(color: Colors.white, fontSize: 12),
-                ),
+                _buildTextField("Retype Password", confirmPasswordController, isPassword: true),
                 SizedBox(height: 20),
                 Center(
                   child: _isLoading
@@ -243,18 +192,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     onPressed: _registerUser,
-                    child: Text(
-                      "Agree & Continue",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 15),
-                Center(
-                  child: Text(
-                    "By clicking, I agree with Terms & Conditions, Service & Privacy Policy",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                    child: Text("Agree & Continue", style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -275,9 +213,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         labelStyle: TextStyle(color: Colors.white70),
         filled: true,
         fillColor: Colors.white24,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }

@@ -1,9 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:async'; // Import this for Future.delayed
+import 'dart:async';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // Ensures Flutter is ready
+
+  // ✅ Initialize Supabase
+  await Supabase.initialize(
+    url: 'https://ropvyxordeaxskpwkqdo.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvcHZ5eG9yZGVheHNrcHdrcWRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwNDY3ODUsImV4cCI6MjA1NTYyMjc4NX0.9dq9wjZwTmkRGI-GqEHEWNTixAL3t7MgPNQVCLm4S6I',
+  );
+
+  // ✅ Initialize Stripe
+  Stripe.publishableKey =
+  "pk_test_51QJcjlCYiaR54l0AvFcUHwXuvMHLO6Anja1NXFSkplNWo3VHLxDukX11DXOvVD7iNUEFCIKdPr5fpN8IvlWdZgKn00SEpYHaWz";
+
+  await initializeDateFormatting('en_US', null); // Initialize date formatting
   runApp(VentFlowApp());
 }
 
@@ -12,7 +28,7 @@ class VentFlowApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: SplashScreen(),
+      home: SplashScreen(), // Start with the splash screen
     );
   }
 }
@@ -30,12 +46,19 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
 
-    // Delay for 3 seconds, then navigate to LoginScreen
-    Future.delayed(Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-      );
+    Future.delayed(Duration(seconds: 3), () async {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      }
     });
   }
 
@@ -79,10 +102,13 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             SizedBox(height: 40),
-            Image.asset(
-              'assets/megaphone.png', // Ensure this file exists
+            Image.network(
+              'https://ropvyxordeaxskpwkqdo.supabase.co/storage/v1/object/public/assets//megaphone.png',
               width: 300,
               height: 200,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(Icons.image_not_supported, size: 100, color: Colors.grey);
+              },
             ),
             SizedBox(height: 50),
             ElevatedButton(

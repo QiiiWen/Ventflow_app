@@ -1,10 +1,31 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.ventflow2">
 
+    <!-- ✅ Required for Android 10+ (Access Images & Videos) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+
+    <!-- ✅ Required for Android 9 and below -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"/>
+
+    <!-- ✅ Required for Camera Access -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
+    <!-- ✅ Required for Location (If Needed) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+
     <application
         android:label="ventflow"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.MaterialComponents.Light.NoActionBar"
+        >
+
 
         <activity
             android:name=".MainActivity"
@@ -28,11 +49,10 @@
 
             <!-- Deep linking intent filter -->
             <intent-filter>
+                <data android:scheme="yourapp" android:host="account_verified"/>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-
-                <!-- Define the scheme and host for deep linking -->
                 <data
                     android:host="account_verified"
                     android:scheme="ventflow"/>
