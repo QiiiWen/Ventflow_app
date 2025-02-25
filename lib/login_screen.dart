@@ -7,6 +7,7 @@ import 'sponsor_screen.dart';
 import 'exhibitor_screen.dart';
 import 'speaker_screen.dart';
 import 'email_request.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -73,8 +74,17 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         nextScreen = AttendeeScreen(firstName: firstName, userId: userId);
       }
-
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => nextScreen));
+      // 🔹 **Step 3: Navigate to HomeScreen (With Role)**
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomeScreen(
+            firstName: firstName,
+            userId: userId,
+            role: role,
+          ),
+        ),
+      );
     } catch (error) {
       print("❌ Login failed: $error");
       ScaffoldMessenger.of(context).showSnackBar(

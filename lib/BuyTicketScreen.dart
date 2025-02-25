@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -90,20 +91,39 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
     }
   }
 
-  /// ✅ **Save Ticket Details to Supabase**
   Future<void> _confirmTicketPurchase() async {
     try {
+      // ✅ Step 1: Check if the user already has a ticket for this event
+      final existingTicket = await supabase
+          .from('tickets')
+          .select('id')
+          .eq('user_id', widget.userId)
+          .eq('event_id', widget.eventId)
+          .maybeSingle(); // Returns null if no ticket exists
+
+      if (existingTicket != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("You have already purchased a ticket for this event!")),
+        );
+        return;
+      }
+
+      // ✅ Step 2: Generate a unique ticket code & transaction ID
+      String ticketCode = _generateTicketCode();
+      String transactionId = _generateTransactionId();
+
+      // ✅ Step 3: Insert the new ticket with a transaction ID
       final response = await supabase.from('tickets').insert({
         'user_id': widget.userId,
         'event_id': widget.eventId,
-        'quantity': _quantity,
+        'quantity': 1,
         'total_price': _finalAmount,
         'status': 'Paid',
+        'ticket_code': ticketCode,
+        'transaction_id': transactionId, // 🔹 Include generated transaction ID
       }).select().single();
 
       if (response != null) {
-        String transactionId = response['id'].toString();
-
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -122,6 +142,17 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
       );
     }
   }
+
+  String _generateTicketCode() {
+    const String chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final Random rnd = Random();
+    return List.generate(10, (index) => chars[rnd.nextInt(chars.length)]).join();
+  }
+
+  String _generateTransactionId() {
+    return "TXN${DateTime.now().millisecondsSinceEpoch}";
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -172,11 +203,6 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
                   Text("Organized by ${widget.organizer}", style: GoogleFonts.sen(fontSize: 14, color: Colors.white60)),
                   SizedBox(height: 20),
 
-                  // ✅ **Quantity Selector**
-                  _buildQuantitySelector(),
-
-                  SizedBox(height: 20),
-
                   // ✅ **Order Summary**
                   _buildOrderSummary(),
 
@@ -205,36 +231,6 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
     );
   }
 
-  /// 📌 **Quantity Selector**
-  Widget _buildQuantitySelector() {
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Color(0xFF6850F6),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text("Quantity:", style: GoogleFonts.sen(fontSize: 18, color: Colors.white)),
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(Icons.remove_circle_outline, color: Colors.white),
-                onPressed: () => setState(() => _quantity = (_quantity > 1) ? _quantity - 1 : 1),
-              ),
-              Text("$_quantity", style: GoogleFonts.sen(fontSize: 18, color: Colors.white)),
-              IconButton(
-                icon: Icon(Icons.add_circle_outline, color: Colors.white),
-                onPressed: () => setState(() => _quantity++),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   /// 📌 **Order Summary**
   Widget _buildOrderSummary() {
     return Container(
@@ -245,7 +241,7 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
       ),
       child: Column(
         children: [
-          _buildOrderRow("Tickets", "\RM${widget.eventPrice.toStringAsFixed(2)}"),
+          _buildOrderRow("Ticket (1)", "\RM${widget.eventPrice.toStringAsFixed(2)}"),
           _buildOrderRow("Order Processing Fee", "\RM1.00"),
           Divider(color: Colors.white24),
           _buildOrderRow("Service Fees (6%)", "\RM${_serviceFee.toStringAsFixed(2)}"),

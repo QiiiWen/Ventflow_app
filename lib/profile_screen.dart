@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'FollowListScreen.dart';
+import 'FollowingListScreen.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import 'search_screen.dart';
@@ -32,7 +34,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _fetchUserProfile();
   }
 
+  void _openFollowersList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FollowersListScreen(userId: widget.userId, loggedInUserId: widget.loggedInUserId,),
+      ),
+    );
+  }
 
+  void _openFollowingList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FollowingListScreen(userId: widget.userId, loggedInUserId: widget.loggedInUserId,),
+      ),
+    );
+  }
   void _openSettings() {
     Navigator.push(
       context,
@@ -155,6 +173,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .eq('follower_id', widget.userId);
       final followingCount = followingResponse.length;
 
+      // 🔥 Check if the logged-in user follows this profile
+      final existingFollow = await supabase
+          .from('followers')
+          .select('id')
+          .eq('follower_id', widget.loggedInUserId)
+          .eq('following_id', widget.userId)
+          .maybeSingle();
+
       // 🔥 Fetch user photos from `posts` table
       final postsResponse = await supabase
           .from('posts')
@@ -174,10 +200,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'following': followingCount,
           'photos': photos, // ✅ Store user photos from `posts`
         };
+        isFollowing = existingFollow != null; // ✅ Set isFollowing correctly
         isLoading = false;
       });
 
-      print("✅ User Profile Loaded with ${photos.length} photos");
+      print("✅ User Profile Loaded - isFollowing: $isFollowing");
     } catch (e) {
       print("❌ Error fetching profile: $e");
       setState(() {
@@ -199,12 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: Text("Profile",
             style: GoogleFonts.sen(fontSize: 20, color: Colors.white)),
         centerTitle: true,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
         actions: [
-
           IconButton(
             icon: Icon(Icons.search, color: Colors.white),
             onPressed: () {
@@ -330,14 +352,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 SizedBox(height: 15),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 5),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildStatColumn(
-                          "Followers", userProfile!['followers'] ?? 0),
-                      _buildStatColumn(
-                          "Following", userProfile!['following'] ?? 0),
+                      GestureDetector(
+                        onTap: _openFollowersList,
+                        child: _buildStatColumn("Followers", userProfile!['followers'] ?? 0),
+                      ),
+                      GestureDetector(
+                        onTap: _openFollowingList,
+                        child: _buildStatColumn("Following", userProfile!['following'] ?? 0),
+                      ),
                     ],
                   ),
                 ),
