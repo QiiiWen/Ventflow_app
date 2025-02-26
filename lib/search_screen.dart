@@ -7,6 +7,7 @@ import 'dart:async';
 class SearchScreen extends StatefulWidget {
   final String loggedInUserId;
 
+// test
   SearchScreen({required this.loggedInUserId});
 
   @override
@@ -64,7 +65,8 @@ class _SearchScreenState extends State<SearchScreen> {
       // ✅ Process profile pictures correctly
       final users = response.map((user) {
         String? profilePicPath = user['profile_pic'];
-        String profilePicUrl = profilePicPath != null && profilePicPath.isNotEmpty
+        String profilePicUrl = profilePicPath != null &&
+                profilePicPath.isNotEmpty
             ? "https://ropvyxordeaxskpwkqdo.supabase.co/storage/v1/object/public/$profilePicPath"
             : "https://via.placeholder.com/150";
 
@@ -95,7 +97,8 @@ class _SearchScreenState extends State<SearchScreen> {
       appBar: AppBar(
         backgroundColor: Color(0xFF040B41),
         elevation: 0,
-        title: Text("Search Users", style: GoogleFonts.sen(fontSize: 20, color: Colors.white)),
+        title: Text("Search Users",
+            style: GoogleFonts.sen(fontSize: 20, color: Colors.white)),
         centerTitle: true,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.white),
@@ -130,31 +133,35 @@ class _SearchScreenState extends State<SearchScreen> {
           else
             Expanded(
               child: _searchResults.isEmpty
-                  ? Center(child: Text("No users found", style: TextStyle(color: Colors.white)))
+                  ? Center(
+                      child: Text("No users found",
+                          style: TextStyle(color: Colors.white)))
                   : ListView.builder(
-                itemCount: _searchResults.length,
-                itemBuilder: (context, index) {
-                  var user = _searchResults[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage: NetworkImage(user['profile_pic']),
-                    ),
-                    title: Text(user['username'] ?? "Unknown", style: TextStyle(color: Colors.white)),
-                    onTap: () {
-                      // ✅ Navigate to the clicked user's profile
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProfileScreen(
-                            userId: user['user_id'], // Clicked user's ID
-                            loggedInUserId: widget.loggedInUserId, // Current logged-in user ID
+                      itemCount: _searchResults.length,
+                      itemBuilder: (context, index) {
+                        var user = _searchResults[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: NetworkImage(user['profile_pic']),
                           ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+                          title: Text(user['username'] ?? "Unknown",
+                              style: TextStyle(color: Colors.white)),
+                          onTap: () {
+                            // ✅ Navigate to the clicked user's profile
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProfileScreen(
+                                  userId: user['user_id'], // Clicked user's ID
+                                  loggedInUserId: widget
+                                      .loggedInUserId, // Current logged-in user ID
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
             ),
         ],
       ),
