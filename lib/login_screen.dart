@@ -8,6 +8,8 @@ import 'exhibitor_screen.dart';
 import 'speaker_screen.dart';
 import 'email_request.dart';
 import 'home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -22,59 +24,64 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final supabase = Supabase.instance.client;
 
-  /// ✅ **Login with Supabase Auth**
   Future<void> login() async {
     setState(() => isLoading = true);
 
     try {
       print("🔍 Attempting login for: ${emailController.text}");
 
-      // 🔹 **Step 1: Authenticate User**
+      // 🔹 Step 1: Authenticate User
       final response = await supabase.auth.signInWithPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      print("✅ Supabase Response: $response");
-
       final user = response.user;
-      if (user == null) {
-        throw "Invalid email or password";
-      }
+      if (user == null) throw "Invalid email or password";
 
-      print("✅ Login Successful! User ID: ${user.id}");
-
-      // 🔹 **Step 2: Fetch User Role**
+      // 🔹 Step 2: Fetch User Data
       final userData = await supabase
           .from('users')
-          .select('role, first_name, id')
+          .select('role, first_name, id, verified')
           .eq('email', user.email!)
           .maybeSingle();
 
-      print("✅ User Data: $userData"); // Debugging Log
+      if (userData == null) throw "User data not found.";
 
-      if (userData == null) {
-        throw "User data not found in database.";
+      if (userData['verified'] == false) {
+        throw "Your account is pending admin approval.";
       }
 
       String role = userData['role'];
       String firstName = userData['first_name'];
-      String userId = userData['id'].toString(); // ✅ Convert to String
+      String userId = userData['id'].toString();
 
-      // 🔹 **Step 3: Navigate to the Correct Screen Based on Role**
+      // 🔹 Step 3: Navigate Based on Role
       Widget nextScreen;
-      if (role == "attendee") {
-        nextScreen = AttendeeScreen(firstName: firstName, userId: userId);
-      } else if (role == "sponsor") {
-        nextScreen = SponsorScreen();
-      } else if (role == "exhibitor") {
-        nextScreen = ExhibitorScreen();
-      } else if (role == "speaker") {
-        nextScreen = SpeakerScreen();
-      } else {
-        nextScreen = AttendeeScreen(firstName: firstName, userId: userId);
+      switch (role) {
+        case "attendee":
+          nextScreen = AttendeeScreen(firstName: firstName, userId: userId);
+          break;
+        case "sponsor":
+          nextScreen = SponsorScreen();
+          break;
+        case "exhibitor":
+          nextScreen = ExhibitorScreen(firstName: firstName, userId: userId);
+          break;
+        case "speaker":
+          nextScreen = SpeakerScreen(firstName: firstName, userId: userId);
+          break;
+        default:
+          throw "🚨 Unknown user role: $role";
       }
-      // 🔹 **Step 3: Navigate to HomeScreen (With Role)**
+
+      if (rememberMe) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('email', emailController.text.trim());
+        await prefs.setString('password', passwordController.text.trim());
+      }
+
+      // 🔹 Step 5: Navigate to Home Screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -88,7 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (error) {
       print("❌ Login failed: $error");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString()), backgroundColor: Colors.red),
+        SnackBar(content: Text("❌ $error"), backgroundColor: Colors.red),
       );
     }
 
@@ -127,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: GoogleFonts.sen(fontSize: 20, color: Colors.white),
                   ),
                   SizedBox(height: 20),
-                  // ✅ **Email Input**
+
                   TextField(
                     controller: emailController,
                     style: TextStyle(color: Colors.white),
@@ -140,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   SizedBox(height: 10),
-                  // ✅ **Password Input**
+
                   TextField(
                     controller: passwordController,
                     obscureText: true,

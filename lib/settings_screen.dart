@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'edit_profile_screen.dart';
+import 'help_center_screen.dart';
 import 'privacy_settings_screen.dart';
 import 'login_security_screen.dart';
 import 'login_screen.dart';
@@ -9,7 +10,7 @@ import 'verify_password_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final String userId;
-  final String userEmail; // User email passed as a parameter
+  final String userEmail;
 
   SettingsScreen({required this.userId, required this.userEmail});
 
@@ -21,7 +22,7 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _logout(BuildContext context) async {
     try {
-      await supabase.auth.signOut(); // ✅ Supabase logout
+      await supabase.auth.signOut();
 
       // Navigate to Login Screen and remove all previous routes
       Navigator.pushAndRemoveUntil(
@@ -92,6 +93,12 @@ class SettingsScreen extends StatelessWidget {
                     icon: Icons.privacy_tip,
                     title: "Privacy Settings",
                     onTap: () => _navigateTo(context, PrivacySettingsScreen(userId: userId)),
+                  ),
+                  _buildSettingsOption(
+                    context,
+                    icon: Icons.help_center,
+                    title: "Help Center",
+                    onTap: () => _navigateTo(context, HelpCenterScreen(userId: userId)),
                   ),
                 ],
               ),

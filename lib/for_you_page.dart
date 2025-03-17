@@ -71,30 +71,39 @@ class _ForYouPageState extends State<ForYouPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+
       backgroundColor: Color(0xFF040B41),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: Colors.white))
-          : _posts.isEmpty
-          ? Center(
-        child: Text(
-          "No posts available",
-          style: GoogleFonts.sen(color: Colors.white70, fontSize: 16),
+
+      body: RefreshIndicator(
+        onRefresh: _fetchForYouPosts, // ✅ Calls function to refresh posts
+        color: Colors.white,
+        child: _isLoading
+            ? Center(child: CircularProgressIndicator(color: Colors.white))
+            : _posts.isEmpty
+            ? Center(
+          child: Text(
+            "No posts available",
+            style: GoogleFonts.sen(color: Colors.white70, fontSize: 16),
+          ),
+        )
+            : ListView.builder(
+          physics: AlwaysScrollableScrollPhysics(), // ✅ Allows pull-to-refresh
+          itemCount: _posts.length,
+          itemBuilder: (context, index) {
+            return _buildPostCard(_posts[index]); // ✅ Correct usage
+          },
         ),
-      )
-          : ListView.builder(
-        itemCount: _posts.length,
-        itemBuilder: (context, index) {
-          return _buildPostCard(_posts[index]);
-        },
       ),
     );
   }
+
 
   Widget _buildPostCard(dynamic post) {
     final userProfiles = post['users']['user_profiles'];
     final user = (userProfiles is List && userProfiles.isNotEmpty) ? userProfiles[0] : null;
 
     return Card(
+      color: Color(0xFF040B41),
       margin: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: Padding(
@@ -114,7 +123,7 @@ class _ForYouPageState extends State<ForYouPage> {
                 SizedBox(width: 10),
                 Text(
                   "@${user != null ? user['username'] ?? 'Unknown' : 'Unknown'}",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ],
             ),
@@ -133,13 +142,20 @@ class _ForYouPageState extends State<ForYouPage> {
                 },
               ),
             ),
-            SizedBox(height: 5),
+            SizedBox(height: 10),
 
-            // 🟢 **Post Caption**
-            Text(
-              post['caption'],
-              style: TextStyle(fontSize: 14),
-            ),
+            Row(
+              children: [
+                Text(
+                  "${user != null ? user['username'] ?? 'Unknown' : 'Unknown'} ",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                Text(
+                  post['caption'],
+                  style: TextStyle(fontSize: 14, color: Colors.white),
+                ),
+              ],
+            )
           ],
         ),
       ),

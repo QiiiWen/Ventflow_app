@@ -3,10 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'EventDetailsScreen.dart';
 import 'OnGoingEventDetailsPage.dart';
+import 'dart:convert';
 
 class OngoingEventsScreen extends StatefulWidget {
   final String userId;
-
 
   OngoingEventsScreen({required this.userId});
 
@@ -36,38 +36,52 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
           .select('event_id')
           .eq('user_id', widget.userId);
 
-      List<int> eventIds = ticketsResponse.map<int>((ticket) => ticket['event_id']).toList();
+      List<int> eventIds =
+          ticketsResponse.map<int>((ticket) => ticket['event_id']).toList();
 
       // 🔹 Fetch All Events & Manually Filter
-      final allEventsResponse = await supabase
-          .from('events')
-          .select('*');
+      final allEventsResponse = await supabase.from('events').select('*');
 
-      // ✅ Manually filter events
+      // ✅ Manually filter ongoing events
       final ongoingEvents = allEventsResponse
-          .where((event) => eventIds.contains(event['id']) && event['status'] == 'ongoing')
+          .where((event) =>
+              eventIds.contains(event['id']) && event['status'] == 'ongoing')
           .toList();
 
+      // ✅ Filter events where user purchased a ticket
       final ticketedEvents = allEventsResponse
           .where((event) => eventIds.contains(event['id']))
           .toList();
 
-      final recommendedEvents = allEventsResponse
-          .where((event) => !eventIds.contains(event['id']) && event['status'] != 'past')
-          .toList()
-          .take(5) // Limit recommendations
-          .toList();
+      // 🔹 CHANGED: Fetch top 5 recommended events via edge function
+      final recommendedResponse =
+          await supabase.functions.invoke('get_top_events', body: {});
+      List<dynamic> recommendedEvents = [];
+      if (recommendedResponse.data != null) {
+        try {
+          // Decode the JSON string returned from the edge function
+          final decodedData = json.decode(recommendedResponse.data);
+          if (decodedData is List) {
+            recommendedEvents = decodedData;
+          } else {
+            print("Decoded data is not a list: $decodedData");
+          }
+        } catch (e) {
+          print("Error decoding recommended events: $e");
+        }
+      }
 
       setState(() {
         _ongoingEvents = ongoingEvents;
         _ticketsPurchased = ticketedEvents;
-        _recommendedEvents = recommendedEvents;
+        _recommendedEvents =
+            recommendedEvents; // CHANGED: Using edge function data
         _isLoading = false;
       });
 
       print("✅ Ongoing Events: $_ongoingEvents");
       print("✅ Tickets Purchased: $_ticketsPurchased");
-      print("✅ Recommended Events: $_recommendedEvents");
+      print("✅ Recommended Events (from edge function): $_recommendedEvents");
     } catch (error) {
       print("❌ Error fetching data: $error");
       setState(() => _isLoading = false);
@@ -77,51 +91,54 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF6850F6), Color(0xFF040B41)],
+      body: RefreshIndicator(
+        onRefresh: _fetchData, // ✅ Calls function to refresh data
+        color: Colors.white,
+        backgroundColor: Color(0xFF040B41),
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF6850F6), Color(0xFF040B41)],
+            ),
           ),
-        ),
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 50),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionTitle("Ongoing Events"),
-              _isLoading
-                  ? Center(child: CircularProgressIndicator(color: Colors.white))
-                  : _ongoingEvents.isEmpty
-                  ? _buildEmptyState("No Ongoing Events Today.")
-                  : _buildEventsList(_ongoingEvents),
-
-              SizedBox(height: 20),
-
-              _buildSectionTitle("Your Tickets"),
-              _isLoading
-                  ? Center(child: CircularProgressIndicator(color: Colors.white))
-                  : _ticketsPurchased.isEmpty
-                  ? _buildEmptyState("No tickets purchased yet.")
-                  : _buildEventsList(_ticketsPurchased, showStatus: true),
-
-              SizedBox(height: 20),
-
-              _buildSectionTitle("Recommended Events"),
-              _isLoading
-                  ? Center(child: CircularProgressIndicator(color: Colors.white))
-                  : _recommendedEvents.isEmpty
-                  ? _buildEmptyState("No recommendations available.")
-                  : _buildHorizontalEventSlider(_recommendedEvents),
-            ],
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 50),
+          child: SingleChildScrollView(
+            physics: AlwaysScrollableScrollPhysics(), // ✅ Enables pull-to-refresh
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionTitle("Ongoing Events"),
+                _isLoading
+                    ? Center(child: CircularProgressIndicator(color: Colors.white))
+                    : _ongoingEvents.isEmpty
+                    ? _buildEmptyState("No Ongoing Events Today.")
+                    : _buildEventsList(_ongoingEvents),
+                SizedBox(height: 20),
+                _buildSectionTitle("Your Tickets"),
+                _isLoading
+                    ? Center(child: CircularProgressIndicator(color: Colors.white))
+                    : _ticketsPurchased.isEmpty
+                    ? _buildEmptyState("No tickets purchased yet.")
+                    : _buildEventsList(_ticketsPurchased, showStatus: true),
+                SizedBox(height: 20),
+                _buildSectionTitle("Recommended Events"),
+                _isLoading
+                    ? Center(child: CircularProgressIndicator(color: Colors.white))
+                    : _recommendedEvents.isEmpty
+                    ? _buildEmptyState("No recommendations available.")
+                    : _buildHorizontalEventSlider(_recommendedEvents),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
 
   /// 🏷 **Section Title**
   Widget _buildSectionTitle(String title) {
@@ -129,7 +146,8 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         title,
-        style: GoogleFonts.sen(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+        style: GoogleFonts.sen(
+            fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
       ),
     );
   }
@@ -147,7 +165,8 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
           borderRadius: BorderRadius.circular(10),
           boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
         ),
-        child: Text(message, style: GoogleFonts.sen(color: Colors.black, fontSize: 16)),
+        child: Text(message,
+            style: GoogleFonts.sen(color: Colors.black, fontSize: 16)),
       ),
     );
   }
@@ -155,7 +174,9 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
   /// 📌 **Event List Widget**
   Widget _buildEventsList(List<dynamic> events, {bool showStatus = false}) {
     return Column(
-      children: events.map((event) => _buildEventCard(event, showStatus: showStatus)).toList(),
+      children: events
+          .map((event) => _buildEventCard(event, showStatus: showStatus))
+          .toList(),
     );
   }
 
@@ -178,14 +199,16 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
           if (bannerPath.isNotEmpty && bannerPath.startsWith("/")) {
             bannerPath = bannerPath.substring(1);
           }
-          String imageUrl = "https://ropvyxordeaxskpwkqdo.supabase.co/storage/v1/object/public/event-banners/$bannerPath";
+          String imageUrl =
+              "https://ropvyxordeaxskpwkqdo.supabase.co/storage/v1/object/public/$bannerPath";
 
           return GestureDetector(
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => EventDetailsScreen(eventId: event['id'], userId: widget.userId),
+                  builder: (context) => EventDetailsScreen(
+                      eventId: event['id'], userId: widget.userId),
                 ),
               );
             },
@@ -213,20 +236,27 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
                           width: double.infinity,
                           height: 120,
                           color: Colors.grey[300],
-                          child: Icon(Icons.image_not_supported, color: Colors.grey),
+                          child: Icon(Icons.image_not_supported,
+                              color: Colors.grey),
                         );
                       },
                     ),
                   ),
                   SizedBox(height: 4),
                   // 📌 **Event Details**
-                  Text(eventName, style: GoogleFonts.sen(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                  Text(eventName,
+                      style: GoogleFonts.sen(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
                   Row(
                     children: [
                       Icon(Icons.location_on, size: 13, color: Colors.white),
                       SizedBox(width: 5),
                       Expanded(
-                        child: Text(eventLocation, style: TextStyle(color: Colors.white, fontSize: 13), overflow: TextOverflow.ellipsis),
+                        child: Text(eventLocation,
+                            style: TextStyle(color: Colors.white, fontSize: 13),
+                            overflow: TextOverflow.ellipsis),
                       ),
                     ],
                   ),
@@ -240,9 +270,9 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
     );
   }
 
-
   /// 🎟 **Event Card Widget** (Updated to Row Layout)
-  Widget _buildEventCard(dynamic event, {bool showStatus = false, bool allowPurchase = false}) {
+  Widget _buildEventCard(dynamic event,
+      {bool showStatus = false, bool allowPurchase = false}) {
     // ✅ Trim and sanitize the icon path
     String iconPath = event['icon']?.trim() ?? '';
     if (iconPath.isNotEmpty && iconPath.startsWith('/')) {
@@ -250,14 +280,16 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
     }
 
     // ✅ Construct the correct Supabase public URL for the icon
-    String iconUrl = "https://ropvyxordeaxskpwkqdo.supabase.co/storage/v1/object/public/$iconPath";
+    String iconUrl =
+        "https://ropvyxordeaxskpwkqdo.supabase.co/storage/v1/object/public/$iconPath";
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => OngoingEventDetailsScreen(eventId: event['id'], userId: widget.userId),
+            builder: (context) => OngoingEventDetailsScreen(
+                eventId: event['id'], userId: widget.userId),
           ),
         );
       },
@@ -300,7 +332,10 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
                 children: [
                   Text(
                     event['name'],
-                    style: GoogleFonts.sen(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+                    style: GoogleFonts.sen(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black),
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
@@ -310,9 +345,9 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
                   if (showStatus)
                     Text(
                       "Status: ${event['status']}",
-                      style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: Colors.blue, fontWeight: FontWeight.bold),
                     ),
-
                 ],
               ),
             ),
@@ -321,5 +356,4 @@ class _OngoingEventsScreenState extends State<OngoingEventsScreen> {
       ),
     );
   }
-
 }

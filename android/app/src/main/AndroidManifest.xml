@@ -2,6 +2,12 @@
     package="com.example.ventflow2">
 
     <!-- ✅ Required for Android 10+ (Access Images & Videos) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
 
@@ -12,6 +18,7 @@
 
     <!-- ✅ Required for Camera Access -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera.ar" android:required="true"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
     <!-- ✅ Required for Location (If Needed) -->
@@ -54,7 +61,7 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data
-                    android:host="account_verified"
+                    android:host="email-confirmation"
                     android:scheme="ventflow"/>
             </intent-filter>
 

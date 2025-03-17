@@ -56,9 +56,6 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
     }
   }
 
-
-
-
   /// ✅ **Handle Stripe Payment**
   Future<void> _processPayment() async {
     setState(() => _isProcessing = true);
@@ -81,7 +78,6 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
 
       // 🔹 Step 4: Confirm Ticket Purchase in Supabase
       await _confirmTicketPurchase();
-
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Payment failed: $e")),
@@ -103,7 +99,9 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
 
       if (existingTicket != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("You have already purchased a ticket for this event!")),
+          SnackBar(
+              content:
+                  Text("You have already purchased a ticket for this event!")),
         );
         return;
       }
@@ -113,15 +111,26 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
       String transactionId = _generateTransactionId();
 
       // ✅ Step 3: Insert the new ticket with a transaction ID
-      final response = await supabase.from('tickets').insert({
-        'user_id': widget.userId,
-        'event_id': widget.eventId,
-        'quantity': 1,
-        'total_price': _finalAmount,
-        'status': 'Paid',
-        'ticket_code': ticketCode,
-        'transaction_id': transactionId, // 🔹 Include generated transaction ID
-      }).select().single();
+      final response = await supabase
+          .from('tickets')
+          .insert({
+            'user_id': widget.userId,
+            'event_id': widget.eventId,
+            'quantity': 1,
+            'total_price': _finalAmount,
+            'status': 'Paid',
+            'ticket_code': ticketCode,
+            'transaction_id':
+                transactionId, // 🔹 Include generated transaction ID
+          })
+          .select()
+          .single();
+
+      // ✅ Step 4: Track the purchase in the user_interactions table
+      await supabase.rpc('track_purchase', params: {
+        'p_user_id': widget.userId,
+        'p_event_id': widget.eventId,
+      });
 
       if (response != null) {
         Navigator.push(
@@ -146,13 +155,13 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
   String _generateTicketCode() {
     const String chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final Random rnd = Random();
-    return List.generate(10, (index) => chars[rnd.nextInt(chars.length)]).join();
+    return List.generate(10, (index) => chars[rnd.nextInt(chars.length)])
+        .join();
   }
 
   String _generateTransactionId() {
     return "TXN${DateTime.now().millisecondsSinceEpoch}";
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +182,10 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 "Your Order",
-                style: GoogleFonts.sen(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.sen(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
               ),
             ),
             SizedBox(height: 10),
@@ -198,9 +210,15 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.eventName, style: GoogleFonts.sen(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                  Text(widget.eventName,
+                      style: GoogleFonts.sen(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
                   SizedBox(height: 5),
-                  Text("Organized by ${widget.organizer}", style: GoogleFonts.sen(fontSize: 14, color: Colors.white60)),
+                  Text("Organized by ${widget.organizer}",
+                      style:
+                          GoogleFonts.sen(fontSize: 14, color: Colors.white60)),
                   SizedBox(height: 20),
 
                   // ✅ **Order Summary**
@@ -212,16 +230,21 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
                   _isProcessing
                       ? Center(child: CircularProgressIndicator())
                       : ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: _processPayment,
-                    child: Center(
-                      child: Text("PAY", style: GoogleFonts.sen(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                    ),
-                  ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30)),
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          onPressed: _processPayment,
+                          child: Center(
+                            child: Text("PAY",
+                                style: GoogleFonts.sen(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
+                          ),
+                        ),
                 ],
               ),
             ),
@@ -241,11 +264,14 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
       ),
       child: Column(
         children: [
-          _buildOrderRow("Ticket (1)", "\RM${widget.eventPrice.toStringAsFixed(2)}"),
+          _buildOrderRow(
+              "Ticket (1)", "\RM${widget.eventPrice.toStringAsFixed(2)}"),
           _buildOrderRow("Order Processing Fee", "\RM1.00"),
           Divider(color: Colors.white24),
-          _buildOrderRow("Service Fees (6%)", "\RM${_serviceFee.toStringAsFixed(2)}"),
-          _buildOrderRow("Total", "\RM${_finalAmount.toStringAsFixed(2)}", isTotal: true),
+          _buildOrderRow(
+              "Service Fees (6%)", "\RM${_serviceFee.toStringAsFixed(2)}"),
+          _buildOrderRow("Total", "\RM${_finalAmount.toStringAsFixed(2)}",
+              isTotal: true),
         ],
       ),
     );
@@ -256,7 +282,11 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: GoogleFonts.sen(fontSize: 16, color: Colors.white)),
-        Text(price, style: GoogleFonts.sen(fontSize: 16, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, color: Colors.white)),
+        Text(price,
+            style: GoogleFonts.sen(
+                fontSize: 16,
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                color: Colors.white)),
       ],
     );
   }

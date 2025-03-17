@@ -37,6 +37,22 @@ class _OngoingEventDetailsScreenState extends State<OngoingEventDetailsScreen> {
     _fetchEventDetails();
   }
 
+  Future<bool> _hasValidTicket(int eventId, String userId) async {
+    final supabase = Supabase.instance.client;
+
+    final response = await supabase
+        .from('tickets')
+        .select('status')
+        .eq('event_id', eventId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (response != null && response['status'] == 'Paid') {
+      return true; // User has a valid ticket
+    }
+    return false; // No valid ticket
+  }
+
   Future<void> _fetchEventDetails() async {
     final supabase = Supabase.instance.client;
 

@@ -5,7 +5,7 @@ import 'EventDetailsScreen.dart';
 import 'profile_screen.dart';
 
 class EventListScreen extends StatefulWidget {
-  final List<dynamic> events;  // ✅ Accepts event list
+  final List<dynamic> events;
   final String initialSearchQuery;
   final String loggedInUserId;
 

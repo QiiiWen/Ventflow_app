@@ -1,12 +1,11 @@
 plugins {
     id "com.android.application"
     id "kotlin-android"
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 }
 
 android {
-    compileSdkVersion 34 // Add this line at the top
+    compileSdkVersion 35 // Updated to SDK 35
 
     namespace = "com.example.ventflow2"
     ndkVersion = flutter.ndkVersion
@@ -22,8 +21,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.ventflow2"
-        minSdkVersion 21
-        targetSdkVersion 34
+        minSdkVersion 24
+        targetSdkVersion 35 // Updated to SDK 35
         multiDexEnabled true
         versionCode = flutter.versionCode
         versionName = flutter.versionName

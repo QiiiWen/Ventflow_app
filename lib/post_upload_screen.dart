@@ -196,14 +196,14 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
 
           /// Recent Gallery Selection Grid
           Container(
-            height: 120,
+            height: 300,
             child: _galleryImages.isEmpty
                 ? Center(child: Text("No images found", style: TextStyle(color: Colors.white)))
                 : GridView.builder(
               padding: EdgeInsets.all(5),
               scrollDirection: Axis.horizontal,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 1,
+                crossAxisCount: 2,
                 crossAxisSpacing: 4,
                 mainAxisSpacing: 4,
               ),

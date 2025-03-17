@@ -62,6 +62,22 @@ class _SplashScreenState extends State<SplashScreen> {
     });
   }
 
+  // ✅ Function to verify user email after clicking deep link
+  Future<void> _verifyUser() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null && user.emailConfirmedAt != null) {
+      await Supabase.instance.client
+          .from('users')
+          .update({'verified': true})
+          .eq('id', user.id);
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("✅ Email verified! You can now log in."),
+        backgroundColor: Colors.green,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

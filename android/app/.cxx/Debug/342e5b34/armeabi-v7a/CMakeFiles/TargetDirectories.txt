@@ -1,0 +1,2 @@
+/Users/chenyee/AndroidStudioProjects/ventflow2/android/app/.cxx/Debug/342e5b34/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/chenyee/AndroidStudioProjects/ventflow2/android/app/.cxx/Debug/342e5b34/armeabi-v7a/CMakeFiles/rebuild_cache.dir

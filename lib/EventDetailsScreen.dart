@@ -1,5 +1,5 @@
 import 'dart:math';
-
+import 'package:postgrest/postgrest.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -29,11 +29,53 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   LatLng? _eventLocation;
   double _distanceInKm = 0.0;
   LatLng? _userLocation;
+  DateTime? _entryTime; // Added for time tracking
+  final supabase = Supabase.instance.client; // Added Supabase instance
 
   @override
   void initState() {
     super.initState();
+    _entryTime = DateTime.now(); // Track entry time
+    _trackInteraction(); // Track initial click
     _fetchEventDetails();
+  }
+
+  Future<void> _trackInteraction() async {
+    try {
+      await supabase.rpc('increment_click', params: {
+        'p_user_id': widget.userId,
+        'p_event_id': widget.eventId,
+      });
+    } catch (e) {
+      print('Error tracking interaction: $e');
+    }
+  }
+
+  Future<void> _trackTimeSpent() async {
+    if (_entryTime == null) return;
+    final duration = DateTime.now().difference(_entryTime!).inSeconds;
+
+    try {
+      await supabase.rpc('increment_time', params: {
+        'p_user_id': widget.userId,
+        'p_event_id': widget.eventId,
+        'seconds': duration,
+      });
+    } catch (e) {
+      print('Error tracking time spent: $e');
+    }
+  }
+
+  Future<void> _trackPurchase() async {
+    try {
+      await supabase.from('user_interactions').upsert({
+        'user_id': widget.userId,
+        'event_id': widget.eventId,
+        'purchase': true,
+      }, onConflict: 'user_id, event_id');
+    } catch (e) {
+      print('Error tracking purchase: $e');
+    }
   }
 
   Future<void> _fetchEventDetails() async {
@@ -51,13 +93,13 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           String? bannerPath = response['banner']?.trim();
 
           // ✅ Remove leading "/" to prevent double slashes
-          if (bannerPath?.startsWith("/") ?? false) bannerPath = bannerPath!.substring(1);
+          if (bannerPath?.startsWith("/") ?? false)
+            bannerPath = bannerPath!.substring(1);
 
           // ✅ Construct proper Supabase storage URLs
           final bannerUrl = bannerPath != null && bannerPath.isNotEmpty
               ? "https://ropvyxordeaxskpwkqdo.supabase.co/storage/v1/object/public/$bannerPath"
               : null;
-
 
           _event = {
             ...response,
@@ -120,11 +162,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
       setState(() {
         _userLocation = LatLng(position.latitude, position.longitude);
-        _distanceInKm = _calculateDistance(
-            position.latitude,
-            position.longitude,
-            lat ?? 3.1390,
-            lng ?? 101.6869);
+        _distanceInKm = _calculateDistance(position.latitude,
+            position.longitude, lat ?? 3.1390, lng ?? 101.6869);
       });
     } catch (e) {
       print("⚠ Error fetching user location: $e");
@@ -164,6 +203,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _trackTimeSpent(); // Track time when leaving screen
     super.dispose();
   }
 
@@ -186,26 +226,29 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                 Container(
                   height: 250,
                   width: double.infinity,
-                  child: _event!['banner'] != null && _event!['banner']!.isNotEmpty
+                  child: _event!['banner'] != null &&
+                          _event!['banner']!.isNotEmpty
                       ? Image.network(
-                    _event!['banner']!,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                              (loadingProgress.expectedTotalBytes ?? 1)
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      print("❌ Image failed to load: $error");
-                      return SizedBox(); // Returns an empty container instead of a placeholder
-                    },
-                  )
+                          _event!['banner']!,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes !=
+                                        null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        (loadingProgress.expectedTotalBytes ??
+                                            1)
+                                    : null,
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            print("❌ Image failed to load: $error");
+                            return SizedBox(); // Returns an empty container instead of a placeholder
+                          },
+                        )
                       : SizedBox(), // No placeholder, just an empty space
                 ),
                 Positioned(
@@ -220,9 +263,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                         builder: (context, remainingTime, child) {
                           return Text(
                             "${remainingTime.inDays.toString().padLeft(2, '0')} : "
-                                "${(remainingTime.inHours % 24).toString().padLeft(2, '0')} : "
-                                "${(remainingTime.inMinutes % 60).toString().padLeft(2, '0')} : "
-                                "${(remainingTime.inSeconds % 60).toString().padLeft(2, '0')}",
+                            "${(remainingTime.inHours % 24).toString().padLeft(2, '0')} : "
+                            "${(remainingTime.inMinutes % 60).toString().padLeft(2, '0')} : "
+                            "${(remainingTime.inSeconds % 60).toString().padLeft(2, '0')}",
                             style: GoogleFonts.sen(
                                 fontSize: 36,
                                 fontWeight: FontWeight.bold,
@@ -232,7 +275,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                       ),
                       SizedBox(height: 4),
                       Text("DAYS    HOURS    MINUTES    SECONDS",
-                          style: GoogleFonts.sen(fontSize: 12, color: Colors.white)),
+                          style: GoogleFonts.sen(
+                              fontSize: 12, color: Colors.white)),
                     ],
                   ),
                 ),
@@ -252,7 +296,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_event!['name'], style: GoogleFonts.sen(fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text(_event!['name'],
+                      style: GoogleFonts.sen(
+                          fontSize: 22, fontWeight: FontWeight.bold)),
 
                   SizedBox(height: 5),
 
@@ -264,15 +310,18 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                       ),
                       SizedBox(width: 8),
                       Text("Organized by ${_event!['organizer']}",
-                          style: GoogleFonts.sen(fontSize: 14, color: Colors.grey[600])),
+                          style: GoogleFonts.sen(
+                              fontSize: 14, color: Colors.grey[600])),
                       Spacer(),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.deepPurple,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text("RM${_event!['price']}", style: GoogleFonts.sen(color: Colors.white)),
+                        child: Text("RM${_event!['price']}",
+                            style: GoogleFonts.sen(color: Colors.white)),
                       ),
                     ],
                   ),
@@ -282,11 +331,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   // **Date & Time**
                   Row(
                     children: [
-                      Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                      Icon(Icons.calendar_today,
+                          size: 16, color: Colors.grey[600]),
                       SizedBox(width: 5),
                       Text(
-                        DateFormat('EEE, MMM d, yyyy - hh:mm a').format(DateTime.parse(_event!['date'])),
-                        style: GoogleFonts.sen(fontSize: 14, color: Colors.grey[700]),
+                        DateFormat('EEE, MMM d, yyyy - hh:mm a')
+                            .format(DateTime.parse(_event!['date'])),
+                        style: GoogleFonts.sen(
+                            fontSize: 14, color: Colors.grey[700]),
                       ),
                     ],
                   ),
@@ -296,12 +348,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   // **Location**
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                      Icon(Icons.location_on,
+                          size: 16, color: Colors.grey[600]),
                       SizedBox(width: 5),
                       Expanded(
                         child: Text(
                           _event!['location'],
-                          style: GoogleFonts.sen(fontSize: 14, color: Colors.grey[700]),
+                          style: GoogleFonts.sen(
+                              fontSize: 14, color: Colors.grey[700]),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -317,7 +371,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                       SizedBox(width: 5),
                       Text(
                         "${_event!['attendees_limit']} slots",
-                        style: GoogleFonts.sen(fontSize: 14, color: Colors.grey[700]),
+                        style: GoogleFonts.sen(
+                            fontSize: 14, color: Colors.grey[700]),
                       ),
                     ],
                   ),
@@ -328,24 +383,35 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                     padding: EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(20)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // **Details Section**
-                        Text("Details", style: GoogleFonts.sen(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+                        Text("Details",
+                            style: GoogleFonts.sen(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.deepPurple)),
                         SizedBox(height: 5),
-                        Text(_event!['description'], style: GoogleFonts.sen(fontSize: 14, color: Colors.grey[700])),
+                        Text(_event!['description'],
+                            style: GoogleFonts.sen(
+                                fontSize: 14, color: Colors.grey[700])),
 
                         // **Map Section**
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text("About the Venue", style: GoogleFonts.sen(fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text("About the Venue",
+                                style: GoogleFonts.sen(
+                                    fontSize: 16, fontWeight: FontWeight.bold)),
                             TextButton(
                               onPressed: () => _openGoogleMaps(),
-                              child: Text("Get Destination", style: GoogleFonts.sen(color: Colors.deepPurple)),
+                              child: Text("Get Destination",
+                                  style: GoogleFonts.sen(
+                                      color: Colors.deepPurple)),
                             ),
                           ],
                         ),
@@ -363,7 +429,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                               ),
                               children: [
                                 TileLayer(
-                                  urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                                  urlTemplate:
+                                      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                                   subdomains: ['a', 'b', 'c'],
                                 ),
                                 MarkerLayer(
@@ -392,19 +459,23 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                           _distanceInKm > 0
                               ? "${_distanceInKm.toStringAsFixed(2)} km distance from your home"
                               : "Fetching location...",
-                          style: GoogleFonts.sen(fontSize: 14, color: Colors.grey[700]),
+                          style: GoogleFonts.sen(
+                              fontSize: 14, color: Colors.grey[700]),
                         ),
 
-                        Text(_event!['location'], style: GoogleFonts.sen(fontSize: 14, color: Colors.grey[600])),
+                        Text(_event!['location'],
+                            style: GoogleFonts.sen(
+                                fontSize: 14, color: Colors.grey[600])),
 
                         SizedBox(height: 20),
 
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _buildButton("Invite", Colors.white, Colors.deepPurple, Colors.deepPurple, () {
-                            }),
-                            _buildButton("Buy Ticket", Colors.deepPurple, Colors.white, Colors.deepPurple, () {
+                            _buildButton("Invite", Colors.white,
+                                Colors.deepPurple, Colors.deepPurple, () {}),
+                            _buildButton("Buy Ticket", Colors.deepPurple,
+                                Colors.white, Colors.deepPurple, () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -412,7 +483,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                                     eventId: widget.eventId,
                                     userId: widget.userId,
                                     eventName: _event!['name'],
-                                    eventPrice: double.tryParse(_event!['price'].toString()) ?? 0.0,
+                                    eventPrice: double.tryParse(
+                                            _event!['price'].toString()) ??
+                                        0.0,
                                     organizer: _event!['organizer'],
                                     bannerUrl: _event!['banner'],
                                   ),
@@ -421,7 +494,6 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                             }),
                           ],
                         ),
-
                       ],
                     ),
                   ),
@@ -434,7 +506,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     );
   }
 
-  Widget _buildButton(String text, Color bgColor, Color textColor, Color borderColor, VoidCallback onPressed) {
+  Widget _buildButton(String text, Color bgColor, Color textColor,
+      Color borderColor, VoidCallback onPressed) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         backgroundColor: bgColor,

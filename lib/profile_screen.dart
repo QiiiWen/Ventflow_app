@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'FollowListScreen.dart';
 import 'FollowingListScreen.dart';
-import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import 'search_screen.dart';
 import 'post_upload_screen.dart';
@@ -29,8 +28,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool isFollowing = false;
 
   @override
+  @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchUserProfile();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _fetchUserProfile();
   }
 
@@ -38,9 +46,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FollowersListScreen(userId: widget.userId, loggedInUserId: widget.loggedInUserId,),
+        builder: (context) => FollowersListScreen(
+          userId: widget.userId,
+          loggedInUserId: widget.loggedInUserId,
+        ),
       ),
-    );
+    ).then((_) => _fetchUserProfile());
   }
 
   void _openFollowingList() {
@@ -57,9 +68,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(
         builder: (context) =>
             SettingsScreen(
-                userId: widget.userId, userEmail: userProfile?['email'] ?? ""),
+              userId: widget.userId, userEmail: userProfile?['email'] ?? ""),
       ),
-    );
+    ).then((_) => _fetchUserProfile());
   }
 
   void _openQRScanner() {
@@ -243,12 +254,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator(color: Colors.white))
-          : userProfile == null
-          ? Center(child: Text(
-          "Profile not found", style: TextStyle(color: Colors.white)))
-          : _buildProfileContent(),
+      body: RefreshIndicator(
+        onRefresh: _fetchUserProfile, // ✅ Pull down to refresh profile
+        color: Colors.white,
+        backgroundColor: Color(0xFF040B41),
+        child: isLoading
+            ? Center(child: CircularProgressIndicator(color: Colors.white))
+            : userProfile == null
+            ? Center(child: Text(
+            "Profile not found", style: TextStyle(color: Colors.white)))
+            : SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(), // ✅ Enables pull-to-refresh
+          child: _buildProfileContent(),
+        ),
+      ),
     );
   }
 
